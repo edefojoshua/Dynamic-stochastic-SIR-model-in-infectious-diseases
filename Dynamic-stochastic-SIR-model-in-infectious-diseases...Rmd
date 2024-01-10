@@ -1,0 +1,101 @@
+---
+title: "Dynamic stochastic SIR model in infectious disease"
+subtitle: Using Discrete Time Markov Chain simulation"
+author: "Joshua Edefo"
+date: "2024-01-10"
+output: github_document
+---
+Case: An outbreak with infection rate of 2% and recovery rate of 3%
+
+Library
+```{r a, message=FALSE}
+library(markovchain)
+```
+
+Diagram of the transition probability matrix
+
+```{r b}
+mcSIR<-new("markovchain", states=c("S", "I", "R"), 
+           transitionMatrix=matrix(data=c(0.98, 0.02, 0, 0, 0.97, 0.03, 0, 0, 1), 
+                                   byrow = TRUE, nrow =  3), name = "SIR") 
+initialState<-c(100000,1,0)
+plot(mcSIR, package = "daigram")
+
+```
+
+Inputs
+
+```{r c}
+N_psa <- 10000
+
+# R code inside a function
+# distribution of transition probabilities using normal distribution
+params<-data.frame(
+  p_Susceptible_Susceptible   = rbeta(N_psa, 98, 2),
+  p_Susceptible_Infected  = rbeta(N_psa,  2, 98),
+  p_Susceptible_Recovered  = rbeta(N_psa,  0, 100),
+  p_Infected_Susceptible  = rbeta(N_psa,  0, 100),
+  p_Infected_Infected = rbeta(N_psa, 97,3),
+  p_Infected_Recovered = rbeta(N_psa,  3, 97),
+  p_Recovered_Susceptible  = rbeta(N_psa,  0, 100),
+  p_Recovered_Infected = rbeta(N_psa,  0,  100),
+  p_Recovered_Recovered = rbeta(N_psa, 100, 1)
+  
+)
+
+model<- function(.params) { 
+  with(.params, {
+    
+    n_t<-40
+    n_s<-3
+    n_c<-1000
+    
+    v_state_names<-c("Susceptible", "Infected", "Recovered")
+    m_P<-matrix(0, nrow = 3, ncol =3, 
+                dimnames = list(from = v_state_names, to = v_state_names ))
+    
+    m_P["Susceptible", "Susceptible"]<- p_Susceptible_Susceptible
+    m_P["Susceptible", "Infected"]<-p_Susceptible_Infected 
+    m_P["Susceptible", "Recovered"]<- p_Susceptible_Recovered 
+    m_P["Infected", "Susceptible"]<-p_Infected_Susceptible
+    m_P["Infected", "Infected"]<-p_Infected_Infected 
+    m_P["Infected", "Recovered"]<-p_Infected_Recovered  
+    m_P["Recovered", "Susceptible"]<-p_Recovered_Susceptible
+    m_P["Recovered", "Infected"]<- p_Recovered_Infected
+    m_P["Recovered", "Recovered"]<- p_Recovered_Recovered
+    
+    # State membership
+    state_membership<-array(NA_real_,  dim= c(n_t, n_s), dimnames = list (cycle =1:n_t, state = v_state_names ))
+    state_membership[1, ] <- c(n_c, 0, 0)
+    for (i in 2:n_t) {state_membership[i, ] <-state_membership[i-1, ] %*% m_P}
+    
+    
+    summary_results = state_membership [40, ] 
+    
+    
+  })
+}
+psa_results <-
+  t(sapply(
+    X = split(params, 1:N_psa), 
+    FUN = model,
+    simplify = TRUE ))
+
+write.csv(psa_results, file="psa_DTMC.csv")
+```
+
+Output
+```{r d}
+psa_results <-
+  t(sapply(
+    X = split(params, 1:N_psa), 
+    FUN = model,
+    simplify = TRUE ))
+
+write.csv(psa_results, file="psa_DTMC.csv")
+```
+
+Session information
+```{r e, message = FALSE}
+sessionInfo()
+```
